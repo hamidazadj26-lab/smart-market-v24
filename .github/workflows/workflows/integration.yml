@@ -1,1 +1,92 @@
+name: Integration tests
 
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  redis-postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: smart_market_test
+          POSTGRES_USER: smart_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U smart_test -d smart_market_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      TEST_REDIS_URL: redis://localhost:6379/15
+      TEST_POSTGRES_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_test
+      ENVIRONMENT: test
+      SECRET_KEY: integration-test-only-secret-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Verify live service connections
+        run: |
+          python - <<'PY'
+          import os
+          import redis
+          from sqlalchemy import create_engine, text
+          r = redis.Redis.from_url(os.environ['TEST_REDIS_URL'])
+          assert r.ping() is True
+          e = create_engine(os.environ['TEST_POSTGRES_URL'])
+          with e.connect() as c:
+              assert c.execute(text('select 1')).scalar_one() == 1
+          e.dispose()
+          print('Redis and PostgreSQL connectivity: OK')
+          PY
+      - name: Run complete test suite including live integrations
+        run: pytest -q
+      - name: Verify mobile-first and PWA contract
+        run: pytest -q tests/test_mobile_contract.py
+      - name: Verify PostgreSQL migration chain and Python compilation
+        run: |
+          alembic upgrade head
+          alembic current
+          alembic heads
+          alembic check
+          python -m compileall -q app migrations scripts
+      - name: Security dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+      - name: Build production container
+        run: docker build -t smart-market-ci:latest .
+      - name: Container smoke test
+        run: |
+          docker run -d --name smart-market-ci -p 18000:8000 \
+            -e ENVIRONMENT=test \
+            -e SECRET_KEY=ci-container-only-secret \
+            smart-market-ci:latest
+          trap 'docker logs smart-market-ci || true; docker rm -f smart-market-ci || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18000/api/live; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:18000/api/live
+          curl -fsS http://127.0.0.1:18000/api/readiness
+          curl -fsS http://127.0.0.1:18000/api/health
