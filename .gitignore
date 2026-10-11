@@ -1,1 +1,52 @@
+Python
 
+pycache/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+Environment variables and secrets
+
+.env
+.env.*
+!.env.example
+
+Local databases and runtime state
+
+*.db
+*.sqlite
+*.sqlite3
+
+Logs and temporary files
+
+*.log
+*.tmp
+*.bak
+*.swp
+
+IDE and operating system
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+Build artifacts
+
+dist/
+build/
+*.egg-info/
+
+Node.js dependencies and generated files
+
+node_modules/
+
+Local test and debug output
+
+coverage.xml
