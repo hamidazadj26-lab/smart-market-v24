@@ -1,0 +1,11 @@
+# Railway legacy Config-as-Code file; it remains supported for existing services.
+# The repository Dockerfile is the source of truth for the image.
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+preDeployCommand = ["alembic upgrade head"]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ALWAYS"
