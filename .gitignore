@@ -1,1 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
 
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Local databases / runtime state
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs / temporary files
+*.log
+*.tmp
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
