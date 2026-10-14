@@ -10,3 +10,4 @@ python-multipart==0.0.20
 psycopg[binary]==3.2.9
 pytest==8.4.1
 redis==6.4.0
+pytest-asyncio==1.2.0
