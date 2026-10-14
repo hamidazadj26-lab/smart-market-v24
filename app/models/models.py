@@ -826,7 +826,7 @@ class TradeOptimizationResult(TimestampMixin, Base):
 
 class EntityIdentity(TimestampMixin, Base):
     __tablename__='entity_identities'
-    __table_args__=(Index('ux_entity_identities_natural_key','entity_type','entity_id','identity_type','normalized_value',unique=True), CheckConstraint('confidence >= 0 AND confidence <= 1', name='ck_entity_identities_confidence_range'))
+    __table_args__=(Index('ux_entity_identities_natural_key','entity_type','entity_id','identity_type','normalized_value',unique=True), CheckConstraint('confidence BETWEEN 0 AND 100', name='ck_entity_identities_confidence_range'))
     id: Mapped[int]=mapped_column(primary_key=True)
     entity_type: Mapped[str]=mapped_column(String(30), index=True)
     entity_id: Mapped[int]=mapped_column(Integer, index=True)
