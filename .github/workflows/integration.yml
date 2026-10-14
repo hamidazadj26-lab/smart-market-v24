@@ -63,9 +63,15 @@ jobs:
         run: pytest -q
       - name: Verify mobile-first and PWA contract
         run: pytest -q tests/test_mobile_contract.py
+      - name: Create isolated migration-check database
+        env:
+          PGPASSWORD: test-only-password
+        run: |
+          psql -h localhost -U smart_test -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE smart_market_migration_test"
       - name: Verify PostgreSQL migration chain and Python compilation
         env:
-          DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_test
+          DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
+          PGPASSWORD: test-only-password
         run: |
           alembic upgrade head
           alembic current
