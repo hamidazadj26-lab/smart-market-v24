@@ -45,7 +45,10 @@ def calculate_total_landed_cost(*, quantity: float, currency: str, supplier_cost
     fx = None if fx_rate is None else _n(fx_rate, "fx_rate")
     if fx is not None and fx <= 0:
         raise ValueError("fx_rate must be > 0")
-    if expected_currency and expected_currency != currency and fx is None:
+    source_currency = (expected_currency or currency).strip().upper()
+    target_currency = currency.strip().upper()
+    currencies_differ = source_currency != target_currency
+    if currencies_differ and fx is None:
         raise ValueError("Explicit FX Rate is required when currencies differ")
 
     customs = _n(customs_value, "customs_value") if customs_value is not None else 0.0
@@ -54,6 +57,9 @@ def calculate_total_landed_cost(*, quantity: float, currency: str, supplier_cost
     if import_cost:
         if not isinstance(import_cost, dict):
             raise TypeError("import_cost must be a mapping.")
+        import_currency = import_cost.get("currency")
+        if import_currency and str(import_currency).strip().upper() != source_currency:
+            raise ValueError("import_cost currency must match expected_currency")
         customs = _n(import_cost.get("customs_value", customs), "import_cost.customs_value")
         taxes = _n(import_cost.get("total_import_taxes_and_fees"), "import_cost.total_import_taxes_and_fees")
         import_rule_id = import_cost.get("rule_id")
@@ -62,6 +68,11 @@ def calculate_total_landed_cost(*, quantity: float, currency: str, supplier_cost
     if taxes < 0:
         raise ValueError("total_import_taxes_and_fees must be >= 0")
 
+    # Supplier and logistics inputs are already in the output currency.
+    # Import-rule amounts are in expected_currency and must be normalized first.
+    if currencies_differ and import_cost:
+        customs *= fx
+        taxes *= fx
     base_currency_total = costs["supplier_cost"] + costs["packaging_cost"] + costs["inland_cost"] + costs["export_cost"]
     insurance = costs["insurance_cost"]
     total = (base_currency_total + costs["freight_cost"] + insurance + taxes
@@ -86,6 +97,9 @@ def calculate_total_landed_cost(*, quantity: float, currency: str, supplier_cost
         "fx_rate": fx, "import_cost_rule_id": import_rule_id,
         "assumptions": {
             "currency_conversion_explicit": fx is not None,
+            "currency_conversion_applied": bool(currencies_differ and import_cost),
+            "import_cost_source_currency": source_currency if import_cost else None,
+            "output_currency": target_currency,
             "customs_value_explicit": customs_value is not None or bool(import_cost),
             "freight_explicit": True, "insurance_explicit": True,
             "destination_handling_explicit": True, "other_cost_explicit": True,
