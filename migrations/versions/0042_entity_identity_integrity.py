@@ -26,12 +26,12 @@ def upgrade():
 
     invalid_confidence = connection.execute(sa.text("""
         SELECT 1 FROM entity_identities
-        WHERE confidence < 0 OR confidence > 1
+        WHERE confidence < 0 OR confidence > 100
         LIMIT 1
     """)).first()
     if invalid_confidence:
         raise RuntimeError(
-            "Cannot enforce entity identity confidence range: values outside [0, 1] exist."
+            "Cannot enforce entity identity confidence range: values outside [0, 100] exist."
         )
 
     self_link = connection.execute(sa.text("""
@@ -53,7 +53,7 @@ def upgrade():
     op.create_check_constraint(
         "ck_entity_identities_confidence_range",
         "entity_identities",
-        "confidence >= 0 AND confidence <= 1",
+        "confidence >= 0 AND confidence <= 100",
     )
     op.create_check_constraint(
         "ck_entity_links_not_self",
