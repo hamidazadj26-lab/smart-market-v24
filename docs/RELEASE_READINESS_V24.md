@@ -1,0 +1,42 @@
+# V24 Release Readiness — Evidence-Based Gate
+
+This checklist is the release gate for the Smart Market V24 candidate. It deliberately separates CI success from production readiness.
+
+## Current verified status (2026-10-14)
+
+- [x] Integration workflow run 38604496414 completed with overall conclusion `success`.
+- [x] The workflow ran the full pytest suite, mobile/PWA contract tests, PostgreSQL migration chain, Python compilation, dependency audit, Docker build, and container health smoke tests.
+- [ ] ORM-to-database schema drift is **not clean**. The workflow currently marks `alembic check` as `continue-on-error: true`, so its failure does not fail the overall run.
+- [ ] No production deployment or production database migration has been performed as part of this branch.
+- [ ] External discovery sources, credentials, and actual Iran→Afghanistan buyer/supplier data have not been proven operational by the CI checks.
+
+## Blocking work before production
+
+### P0 — Database correctness
+- [ ] Re-run `alembic check` against an isolated PostgreSQL/PostGIS database at the current branch head.
+- [ ] Classify each difference into: (a) semantic constraint/nullability mismatch, (b) missing performance index, or (c) equivalent naming/representation difference.
+- [ ] For nullable-to-non-null changes, add a reviewed backfill and preflight query; fail with an actionable message if invalid legacy rows exist. Never silently discard or invent commercial data.
+- [ ] Reconcile unique constraints versus unique indexes only after verifying duplicates and existing production schema behavior.
+- [ ] Make schema drift audit blocking only after the actual drift has been resolved and the clean check is demonstrated.
+
+### P0 — Release and deployment safety
+- [ ] Confirm the target Railway project/service, start command, health/readiness routes, and required environment variables.
+- [ ] Run migrations on a disposable/staging database first and verify `alembic current` equals the single `alembic heads` revision.
+- [ ] Verify rollback/recovery and database backup procedures before any production migration.
+- [ ] Keep the existing production service unchanged until staging smoke tests and explicit deployment approval.
+
+### P1 — Real business workflow (not just a demo)
+- [ ] Prove the complete workflow with persisted records: product → supplier candidates → buyer candidates → evidence-backed demand → ranked opportunity → landed-cost estimate → follow-up/deal status.
+- [ ] Ensure every buyer/demand assertion carries source, evidence, confidence, and last-checked/freshness information; distinguish a business listing from evidence of purchase intent.
+- [ ] Validate landed-cost calculations against hand-calculated fixtures, including currencies/FX provenance, duties, freight, fees, missing inputs, and zero/negative values.
+- [ ] Verify source adapters honestly report configured/available/failed states; no fabricated discovery results or success indicators.
+- [ ] Test the mobile RTL UI against real API responses and errors, including empty states, slow network, authentication expiry, and small screens.
+
+### P2 — Operational readiness
+- [ ] Verify structured logs, actionable error reporting, background-job retry/lease behavior, and duplicate-job protection.
+- [ ] Verify authentication, session revocation/expiry, authorization boundaries, secret configuration, and dependency security.
+- [ ] Add a staging smoke-test record with commit SHA, migration head, test outcome, and manual workflow evidence.
+
+## Release decision
+
+**Current decision: NOT READY FOR PRODUCTION.** The current CI overall success is not proof of schema parity or live commercial data discovery because the schema-drift audit is explicitly non-blocking and external source credentials/data are not exercised by these tests. Continue on this branch, close the database and end-to-end workflow blockers, then stage and verify before deployment.
