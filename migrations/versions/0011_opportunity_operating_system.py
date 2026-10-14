@@ -11,7 +11,20 @@ down_revision = "0010_market_price_intelligence"
 branch_labels = None
 depends_on = None
 
+
 def upgrade():
+    # Alembic creates alembic_version.version_num as VARCHAR(32). This and
+    # subsequent descriptive revision IDs exceed that limit, so widen it
+    # before Alembic records this revision. This is required for existing DBs
+    # upgrading from revision 0010 as well as fresh installations.
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=32),
+        type_=sa.String(length=128),
+        existing_nullable=False,
+    )
+
     op.add_column("opportunities", sa.Column("opportunity_stage", sa.String(length=40), nullable=False, server_default="Discovered"))
     op.add_column("opportunities", sa.Column("stage_due_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("opportunities", sa.Column("stage_owner_id", sa.Integer(), nullable=True))
@@ -26,6 +39,7 @@ def upgrade():
     op.create_index("ix_opportunities_stage_owner_id", "opportunities", ["stage_owner_id"])
     op.create_index("ix_opportunities_stage_updated_at", "opportunities", ["stage_updated_at"])
 
+
 def downgrade():
     op.drop_index("ix_opportunities_stage_updated_at", table_name="opportunities")
     op.drop_index("ix_opportunities_stage_owner_id", table_name="opportunities")
@@ -33,5 +47,5 @@ def downgrade():
     op.drop_index("ix_opportunities_opportunity_stage", table_name="opportunities")
     with op.batch_alter_table("opportunities") as batch:
         batch.drop_constraint("fk_opportunities_stage_owner", type_="foreignkey")
-    for col in ["stage_updated_at","closed_at","lost_reason","stage_reason","stage_owner_id","stage_due_at","opportunity_stage"]:
+    for col in ["stage_updated_at", "closed_at", "lost_reason", "stage_reason", "stage_owner_id", "stage_due_at", "opportunity_stage"]:
         op.drop_column("opportunities", col)
