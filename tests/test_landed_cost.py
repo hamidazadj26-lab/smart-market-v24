@@ -61,3 +61,30 @@ def test_boolean_cost_is_rejected_as_invalid_numeric_input():
         calculate_total_landed_cost(
             quantity=1, currency="USD", supplier_cost=True,
         )
+
+
+def test_import_rule_amounts_are_converted_to_landed_cost_currency():
+    result = calculate_total_landed_cost(
+        quantity=2, currency="AFN", supplier_cost=1000,
+        customs_value=100, import_cost={
+            "currency": "USD", "customs_value": 100,
+            "total_import_taxes_and_fees": 10, "rule_id": 4,
+        }, fx_rate=70, expected_currency="USD",
+    )
+    assert result["customs_value"] == 7000
+    assert result["import_taxes_and_fees"] == 700
+    assert result["total_landed_cost"] == 1700
+    assert result["landed_unit_cost"] == 850
+    assert result["assumptions"]["currency_conversion_applied"] is True
+    assert result["assumptions"]["output_currency"] == "AFN"
+
+
+def test_import_rule_currency_must_match_declared_source_currency():
+    with pytest.raises(ValueError, match="import_cost currency"):
+        calculate_total_landed_cost(
+            quantity=1, currency="AFN", supplier_cost=100,
+            import_cost={
+                "currency": "EUR", "customs_value": 10,
+                "total_import_taxes_and_fees": 2,
+            }, fx_rate=70, expected_currency="USD",
+        )
