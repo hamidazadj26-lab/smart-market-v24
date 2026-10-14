@@ -13,17 +13,17 @@ depends_on = None
 
 
 def upgrade():
-    # Alembic creates alembic_version.version_num as VARCHAR(32). This and
-    # subsequent descriptive revision IDs exceed that limit, so widen it
-    # before Alembic records this revision. This is required for existing DBs
-    # upgrading from revision 0010 as well as fresh installations.
-    op.alter_column(
-        "alembic_version",
-        "version_num",
-        existing_type=sa.String(length=32),
-        type_=sa.String(length=128),
-        existing_nullable=False,
-    )
+    # PostgreSQL enforces the VARCHAR(32) limit of Alembic's version table,
+    # while SQLite ignores VARCHAR length declarations and does not support
+    # ALTER COLUMN TYPE. Widen the column only on PostgreSQL.
+    if op.get_bind().dialect.name == "postgresql":
+        op.alter_column(
+            "alembic_version",
+            "version_num",
+            existing_type=sa.String(length=32),
+            type_=sa.String(length=128),
+            existing_nullable=False,
+        )
 
     op.add_column("opportunities", sa.Column("opportunity_stage", sa.String(length=40), nullable=False, server_default="Discovered"))
     op.add_column("opportunities", sa.Column("stage_due_at", sa.DateTime(timezone=True), nullable=True))
