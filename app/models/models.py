@@ -264,6 +264,12 @@ class Demand(TimestampMixin, Base):
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     verification_status: Mapped[str]=mapped_column(String(30), default='Unverified', index=True)
     verification_notes: Mapped[str|None]=mapped_column(Text, nullable=True)
+    freshness_status: Mapped[str]=mapped_column(String(30), default='Unknown', index=True)
+    freshness_score: Mapped[float|None]=mapped_column(Float, nullable=True, index=True)
+    observed_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    updated_at_source: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    expires_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_verified_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class SourceSignal(TimestampMixin, Base):
