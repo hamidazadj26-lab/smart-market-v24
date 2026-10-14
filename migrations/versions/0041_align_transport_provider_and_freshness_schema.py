@@ -36,6 +36,34 @@ def upgrade():
                 server_default="Unknown",
             )
 
+    # Align identity graph integrity and JSON payload nullability.
+    op.execute(sa.text(
+        "UPDATE entity_identities SET evidence = '{}' WHERE evidence IS NULL"
+    ))
+    op.execute(sa.text(
+        "UPDATE entity_links SET reasons = '[]' WHERE reasons IS NULL"
+    ))
+    op.execute(sa.text(
+        "UPDATE entity_links SET evidence = '{}' WHERE evidence IS NULL"
+    ))
+    with op.batch_alter_table("entity_identities") as batch:
+        batch.alter_column(
+            "evidence", existing_type=sa.JSON(), nullable=False,
+            server_default=sa.text("'{}'"),
+        )
+        batch.create_foreign_key(
+            "fk_entity_identities_source_id", "sources", ["source_id"], ["id"]
+        )
+    with op.batch_alter_table("entity_links") as batch:
+        batch.alter_column(
+            "reasons", existing_type=sa.JSON(), nullable=False,
+            server_default=sa.text("'[]'"),
+        )
+        batch.alter_column(
+            "evidence", existing_type=sa.JSON(), nullable=False,
+            server_default=sa.text("'{}'"),
+        )
+
     # The freshness model marks these fields indexed. Earlier migrations added
     # the columns but omitted their indexes.
     freshness_indexes = {
@@ -74,6 +102,13 @@ def downgrade():
     ):
         for column in columns:
             op.drop_index(f"ix_{table}_{column}", table_name=table)
+
+    with op.batch_alter_table("entity_links") as batch:
+        batch.alter_column("evidence", existing_type=sa.JSON(), nullable=True, server_default=None)
+        batch.alter_column("reasons", existing_type=sa.JSON(), nullable=True, server_default=None)
+    with op.batch_alter_table("entity_identities") as batch:
+        batch.drop_constraint("fk_entity_identities_source_id", type_="foreignkey")
+        batch.alter_column("evidence", existing_type=sa.JSON(), nullable=True, server_default=None)
 
     for table in ("demands", "source_signals", "sources"):
         with op.batch_alter_table(table) as batch:
