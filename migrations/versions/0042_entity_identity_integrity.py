@@ -50,23 +50,23 @@ def upgrade():
         ["entity_type", "entity_id", "identity_type", "normalized_value"],
         unique=True,
     )
-    op.create_check_constraint(
-        "ck_entity_identities_confidence_range",
-        "entity_identities",
-        "confidence >= 0 AND confidence <= 100",
-    )
-    op.create_check_constraint(
-        "ck_entity_links_not_self",
-        "entity_links",
-        "NOT (left_type = right_type AND left_id = right_id)",
-    )
+    # SQLite cannot ALTER a table to add/drop CHECK constraints directly.
+    # Alembic batch mode rebuilds the table on SQLite and uses ALTER on PostgreSQL.
+    with op.batch_alter_table("entity_identities") as batch_op:
+        batch_op.create_check_constraint(
+            "ck_entity_identities_confidence_range",
+            "confidence >= 0 AND confidence <= 100",
+        )
+    with op.batch_alter_table("entity_links") as batch_op:
+        batch_op.create_check_constraint(
+            "ck_entity_links_not_self",
+            "NOT (left_type = right_type AND left_id = right_id)",
+        )
 
 
 def downgrade():
-    op.drop_constraint("ck_entity_links_not_self", "entity_links", type_="check")
-    op.drop_constraint(
-        "ck_entity_identities_confidence_range",
-        "entity_identities",
-        type_="check",
-    )
+    with op.batch_alter_table("entity_links") as batch_op:
+        batch_op.drop_constraint("ck_entity_links_not_self", type_="check")
+    with op.batch_alter_table("entity_identities") as batch_op:
+        batch_op.drop_constraint("ck_entity_identities_confidence_range", type_="check")
     op.drop_index("ux_entity_identities_natural_key", table_name="entity_identities")
