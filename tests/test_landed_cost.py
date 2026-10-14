@@ -14,3 +14,50 @@ def test_no_import_rule_does_not_invent_tax():
     r=calculate_total_landed_cost(quantity=10,currency='USD',supplier_cost=100,customs_value=None)
     assert r['import_taxes_and_fees']==0
     assert r['total_landed_cost']==100
+
+
+import pytest
+
+
+@pytest.mark.parametrize("field", [
+    "supplier_cost", "packaging_cost", "inland_cost", "export_cost",
+    "freight_cost", "insurance_cost", "destination_handling", "other_cost",
+])
+@pytest.mark.parametrize("bad_value", [-1, float("nan"), float("inf"), -float("inf")])
+def test_invalid_cost_components_are_rejected(field, bad_value):
+    kwargs = {"quantity": 1, "currency": "USD", "supplier_cost": 1, field: bad_value}
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(**kwargs)
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), 0, -1])
+def test_invalid_fx_rates_are_rejected(bad_value):
+    with pytest.raises(ValueError):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10,
+            fx_rate=bad_value, expected_currency="EUR",
+        )
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), -1])
+def test_invalid_import_taxes_are_rejected(bad_value):
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10,
+            import_cost={"total_import_taxes_and_fees": bad_value},
+        )
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), -1])
+def test_invalid_customs_values_are_rejected(bad_value):
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10, customs_value=bad_value,
+        )
+
+
+def test_boolean_cost_is_rejected_as_invalid_numeric_input():
+    with pytest.raises(TypeError):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=True,
+        )
