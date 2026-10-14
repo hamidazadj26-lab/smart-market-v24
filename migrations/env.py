@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import String, Text, engine_from_config, pool
+
 from app.database import Base
 from app.models import *
 from app.config import get_settings
@@ -15,21 +16,27 @@ target_metadata = Base.metadata
 
 
 def _compare_type(context_, inspected_column, metadata_column, inspected_type, metadata_type):
-    """Avoid churn for PostgreSQL's equivalent unbounded VARCHAR/TEXT types."""
+    """Avoid churn for equivalent unbounded PostgreSQL VARCHAR/TEXT declarations."""
     string_types = (String, Text)
     if isinstance(inspected_type, string_types) and isinstance(metadata_type, string_types):
-        inspected_length = getattr(inspected_type, "length", None)
-        metadata_length = getattr(metadata_type, "length", None)
-        if inspected_length is None and metadata_length is None:
+        if getattr(inspected_type, "length", None) is None and getattr(metadata_type, "length", None) is None:
             return False
-    # None delegates all other comparisons to Alembic's normal comparator.
     return None
 
 
 def _include_object(object_, name, type_, reflected, compare_to):
-    # PostGIS owns this extension table; it is not part of the application schema.
+    """Exclude extension-owned and intentionally unmapped PostGIS schema objects."""
     if type_ == "table" and name == "spatial_ref_sys" and reflected:
         return False
+
+    # Legacy spatial columns/indexes are created by migrations for spatial queries,
+    # but are intentionally not mapped in the ORM. Alembic must not propose dropping them.
+    if reflected and type_ == "column" and name == "geom":
+        return False
+    if reflected and type_ == "index":
+        columns = getattr(object_, "columns", ())
+        if name.endswith("_geom") or any(getattr(column, "name", None) == "geom" for column in columns):
+            return False
     return True
 
 
