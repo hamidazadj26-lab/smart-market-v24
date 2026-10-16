@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = 'SMART MARKET'
-    version: str = '24.23.0'
+    version: str = '24.24.0'
     environment: str = 'development'
     debug: bool = False
     secret_key: str = 'change-me-in-production'
