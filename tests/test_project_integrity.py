@@ -23,7 +23,8 @@ def test_migration_chain_is_single_and_complete():
     by_id={revision:down for revision,down in rows.values()}
     heads=[revision for revision in ids if revision not in set(by_id.values())]
     assert len(heads)==1
-    assert heads[0]=='0042_entity_identity_integrity'
+    assert heads[0]=='0043_nullable_derived_offer_totals'
+    assert by_id['0043_nullable_derived_offer_totals']=='0042_entity_identity_integrity'
     assert by_id['0011_opportunity_operating_system']=='0010_market_price_intelligence'
 
 def test_production_auth_has_no_passlib_dependency():
