@@ -1,7 +1,8 @@
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import String, Text, engine_from_config, pool
+from sqlalchemy import String, Text, engine_from_config, inspect, pool
+from sqlalchemy.schema import Index
 
 from app.database import Base
 from app.models import *
@@ -13,6 +14,7 @@ if config.config_file_name:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+_reflected_index_signatures = set()
 
 
 def _compare_type(context_, inspected_column, metadata_column, inspected_type, metadata_type):
@@ -24,17 +26,77 @@ def _compare_type(context_, inspected_column, metadata_column, inspected_type, m
     return None
 
 
-def _index_signature(index):
-    """Return the schema-relevant shape of an index, excluding its name."""
-    columns = tuple(getattr(column, "name", None) for column in getattr(index, "columns", ()))
-    if not columns or any(column is None for column in columns):
+def _non_default_options(options):
+    """Normalize dialect-specific index options while retaining meaningful differences."""
+    normalized = []
+    try:
+        items = options.items()
+    except AttributeError:
+        return ()
+
+    for dialect, dialect_options in items:
+        try:
+            option_items = dialect_options.items()
+        except AttributeError:
+            option_items = ()
+        for key, value in option_items:
+            if value is None or value is False or value == {} or value == [] or value == ():
+                continue
+            # PostgreSQL's default index method is btree; don't treat its reflection
+            # spelling as a semantic difference from SQLAlchemy's implicit default.
+            if dialect == "postgresql" and key == "using" and value == "btree":
+                continue
+            normalized.append((str(dialect), str(key), str(value)))
+    return tuple(sorted(normalized))
+
+
+def _index_signature(index, table_name=None):
+    """Return index shape without its cosmetic name; preserve order and uniqueness."""
+    if isinstance(index, dict):
+        columns = tuple(index.get("column_names") or ())
+        unique = bool(index.get("unique", False))
+        options = index.get("dialect_options") or {}
+        # Some SQLAlchemy dialects expose index options at the top level.
+        flattened = dict(options)
+        for key, value in index.items():
+            if key.startswith(("postgresql_", "sqlite_", "mysql_")):
+                flattened[key] = value
+        normalized_options = tuple(sorted(
+            (str(key), str(value)) for key, value in flattened.items()
+            if value is not None and value is not False and value not in ({}, [], ())
+            and not (key == "postgresql_using" and value == "btree")
+        ))
+        table = table_name or index.get("table_name")
+    else:
+        columns = tuple(getattr(column, "name", None) for column in getattr(index, "columns", ()))
+        unique = bool(getattr(index, "unique", False))
+        normalized_options = _non_default_options(getattr(index, "dialect_options", {}))
+        table = table_name or getattr(getattr(index, "table", None), "name", None)
+
+    if not table or not columns or any(column is None for column in columns):
         return None
-    dialect_options = repr(getattr(index, "dialect_options", {}))
-    return columns, bool(getattr(index, "unique", False)), dialect_options
+    return table, columns, unique, normalized_options
+
+
+def _load_reflected_index_signatures(connection):
+    """Cache live index shapes so equivalent legacy names can be matched both ways."""
+    signatures = set()
+    inspector = inspect(connection)
+    for table_name in inspector.get_table_names():
+        try:
+            indexes = inspector.get_indexes(table_name)
+        except Exception:
+            # Keep the schema audit conservative if a table's indexes cannot be inspected.
+            continue
+        for index in indexes:
+            signature = _index_signature(index, table_name)
+            if signature is not None:
+                signatures.add(signature)
+    return signatures
 
 
 def _include_object(object_, name, type_, reflected, compare_to):
-    """Ignore extension-owned objects and name-only index drift, not shape changes."""
+    """Ignore extension-owned objects and cosmetic index-name drift, not shape changes."""
     if type_ == "table" and name == "spatial_ref_sys" and reflected:
         return False
 
@@ -50,13 +112,18 @@ def _include_object(object_, name, type_, reflected, compare_to):
         ):
             return False
 
-        # Several historical migrations use concise index names while SQLAlchemy
-        # generates table/column-based names. If both indexes have identical ordered
-        # columns, uniqueness, and dialect options, their names are cosmetic. Ignore
-        # only this exact equivalence; composite-vs-single-column and unique-vs-
-        # non-unique differences must remain visible to the blocking schema gate.
-        if compare_to is not None and type(compare_to).__name__ == "Index":
-            if _index_signature(object_) == _index_signature(compare_to):
+        signature = _index_signature(object_)
+        if signature is not None:
+            # Alembic's compare_to is commonly None when the index names differ.
+            # Match exact schema shapes against the opposite side explicitly.
+            if reflected:
+                table = signature[0]
+                metadata_table = target_metadata.tables.get(table)
+                if metadata_table is not None:
+                    for metadata_index in metadata_table.indexes:
+                        if _index_signature(metadata_index, table) == signature:
+                            return False
+            elif signature in _reflected_index_signatures:
                 return False
     return True
 
@@ -74,12 +141,14 @@ def run_migrations_offline():
 
 
 def run_migrations_online():
+    global _reflected_index_signatures
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        _reflected_index_signatures = _load_reflected_index_signatures(connection)
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
