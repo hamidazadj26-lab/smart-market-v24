@@ -102,7 +102,8 @@ jobs:
           alembic heads
           python -m compileall -q app migrations scripts
       - name: Diagnose Alembic database revision state
-        # Diagnostic only: preserve revision evidence even if later checks fail.
+        # Always collect revision evidence, including when the migration verification step fails.
+        if: always()
         continue-on-error: true
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
@@ -171,6 +172,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
         run: |
+          mkdir -p artifacts/schema-drift
           set -o pipefail
           alembic check 2>&1 | tee artifacts/schema-drift/alembic-check.log
       - name: Report schema drift release blocker
