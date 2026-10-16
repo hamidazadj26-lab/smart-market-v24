@@ -8,8 +8,8 @@
 - Synchronize API and PWA cache version metadata to `24.24.0`.
 
 ## Verification evidence
-- Integration run [38927844741](https://github.com/hamidazadj26-lab/smart-market-v24/actions/runs/38927844741) passed at code commit `db8998ffb816dbce6009a3d4756893165e17eeec`: 212 tests passed, 7 mobile/PWA contract tests passed, migration chain reached `0044`, blocking `alembic check` reported `No new upgrade operations detected`, dependency audit passed, Docker image built, and container smoke test passed.
-- A follow-up commit updates release-readiness documentation and version labels; its own CI run must also pass before this candidate is considered verified at the current head.
+- Integration run [38929097538](https://github.com/hamidazadj26-lab/smart-market-v24/actions/runs/38929097538) passed at commit `8d3ac2d71488af883b3d81ac9a04317846c8a3ae`: 212 tests passed, 7 mobile/PWA contract tests passed, migration chain reached `0044`, blocking `alembic check` reported `No new upgrade operations detected`, dependency audit passed, Docker image built, and container smoke test passed.
+- The mobile/PWA contract tests now derive the expected cache version from `app/config.py`, preventing future releases from failing solely because tests hard-coded an older version.
 
 ## Release limitations
 - **Not approved for production.** No Railway deployment or production database migration was performed.
