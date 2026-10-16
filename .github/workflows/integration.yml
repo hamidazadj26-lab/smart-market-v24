@@ -78,6 +78,8 @@ jobs:
           alembic heads
           python -m compileall -q app migrations scripts
       - name: Generate review-only ORM/schema drift proposal
+        # Diagnostic only: its failure must not skip the authoritative blocking audit below.
+        continue-on-error: true
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
         run: |
@@ -102,6 +104,7 @@ jobs:
           # Keep the proposal outside Alembic's versions directory so it cannot become a migration head.
           rm -f "$generated"
       - name: Audit ORM-to-migration schema drift (blocking release gate)
+        if: always()
         id: orm_schema_drift_audit
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
