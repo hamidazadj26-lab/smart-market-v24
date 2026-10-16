@@ -18,7 +18,8 @@ This checklist is the release gate for the Smart Market V24 candidate. It delibe
 - [ ] Classify each difference into: (a) semantic constraint/nullability mismatch, (b) missing performance index, or (c) equivalent naming/representation difference.
 - [ ] For nullable-to-non-null changes, add a reviewed backfill and preflight query; fail with an actionable message if invalid legacy rows exist. Never silently discard or invent commercial data.
 - [ ] Reconcile unique constraints versus unique indexes only after verifying duplicates and existing production schema behavior.
-- [ ] Make schema drift audit blocking only after the actual drift has been resolved and the clean check is demonstrated.
+- [x] Keep the schema-drift audit blocking in CI on this branch; do not restore `continue-on-error` to make a red check appear green.
+- [ ] Reconcile the reported metadata/migration differences in small reviewed batches, preserving useful composite indexes and equivalent uniqueness guarantees, until `alembic check` passes without suppressing failures.
 
 ### P0 — Release and deployment safety
 - [ ] Confirm the target Railway project/service, start command, health/readiness routes, and required environment variables.
