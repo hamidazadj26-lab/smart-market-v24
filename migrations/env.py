@@ -2,7 +2,7 @@ from logging.config import fileConfig
 import os
 
 from alembic import context
-from sqlalchemy import String, Text, create_engine, inspect, pool
+from sqlalchemy import String, Text, create_engine, inspect, pool, text
 from sqlalchemy.schema import Index
 
 from app.database import Base
@@ -158,7 +158,7 @@ def run_migrations_online():
     connectable = create_engine(_database_url(), poolclass=pool.NullPool)
     with connectable.connect() as connection:
         database_identity = connection.execute(
-            __import__("sqlalchemy").text(
+            text(
                 "SELECT current_database(), current_schema(), current_setting('search_path')"
             )
         ).one()
