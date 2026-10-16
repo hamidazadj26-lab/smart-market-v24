@@ -300,6 +300,8 @@ class SourceSignal(TimestampMixin, Base):
 
 class Opportunity(TimestampMixin, Base):
     __tablename__='opportunities'
+    # Preserve the legacy composite index used by stage/update queue queries.
+    __table_args__=(Index('ix_opportunities_stage_updated','opportunity_stage','stage_updated_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     manufacturer_id: Mapped[int]=mapped_column(ForeignKey('manufacturers.id'), index=True)
     customer_id: Mapped[int]=mapped_column(ForeignKey('customers.id'), index=True)
@@ -337,6 +339,8 @@ class Opportunity(TimestampMixin, Base):
 
 class CommercialFact(TimestampMixin, Base):
     __tablename__='commercial_facts'
+    # Keep the established entity lookup index; separate field indexes are additive.
+    __table_args__=(Index('ix_commercial_facts_entity','entity_type','entity_id'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     entity_type: Mapped[str]=mapped_column(String(60), index=True)
     entity_id: Mapped[int]=mapped_column(Integer, index=True)
@@ -351,6 +355,8 @@ class CommercialFact(TimestampMixin, Base):
 
 class FXRate(TimestampMixin, Base):
     __tablename__='fx_rates'
+    # Preserve the currency-pair lookup index from migration 0038.
+    __table_args__=(Index('ix_fx_rates_pair','base_currency','quote_currency'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     base_currency: Mapped[str]=mapped_column(String(10), index=True)
     quote_currency: Mapped[str]=mapped_column(String(10), index=True)
@@ -596,6 +602,8 @@ class LogisticsScenario(TimestampMixin, Base):
 
 class MarketPriceObservation(TimestampMixin, Base):
     __tablename__='market_price_observations'
+    # Preserve the composite index for product/market/time-series lookups.
+    __table_args__=(Index('ix_market_price_obs_product_market_observed','product_id','market','observed_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     product_id: Mapped[int]=mapped_column(ForeignKey('products.id'), index=True)
     market: Mapped[str]=mapped_column(String(160), index=True)
@@ -856,7 +864,12 @@ class EntityLink(TimestampMixin, Base):
     reasons: Mapped[list]=mapped_column(JSON, default=list)
     evidence: Mapped[dict]=mapped_column(JSON, default=dict)
     reviewed: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
-    __table_args__=(Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True), CheckConstraint('NOT (left_type = right_type AND left_id = right_id)', name='ck_entity_links_not_self'))
+    __table_args__=(
+        Index('ix_entity_links_left','left_type','left_id'),
+        Index('ix_entity_links_right','right_type','right_id'),
+        Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True),
+        CheckConstraint('NOT (left_type = right_type AND left_id = right_id)', name='ck_entity_links_not_self'),
+    )
 
 class SearchCache(TimestampMixin, Base):
     __tablename__='search_cache'
@@ -883,6 +896,8 @@ class DiscoveryUsage(TimestampMixin, Base):
 
 class DiscoveryJob(TimestampMixin, Base):
     __tablename__='discovery_jobs'
+    # Preserve the queue/heartbeat index used for stale-job recovery.
+    __table_args__=(Index('ix_discovery_jobs_status_heartbeat','status','heartbeat_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     job_type: Mapped[str]=mapped_column(String(50),index=True)
     status: Mapped[str]=mapped_column(String(30),default='queued',index=True)
