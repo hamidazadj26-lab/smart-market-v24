@@ -11,17 +11,19 @@ class TimestampMixin:
 
 class Admin(TimestampMixin, Base):
     __tablename__='admins'
+    __table_args__=(Index('ix_admins_username','username'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    username: Mapped[str]=mapped_column(String(80), unique=True, index=True)
+    username: Mapped[str]=mapped_column(String(80), unique=True)
     password_hash: Mapped[str]=mapped_column(String(255))
     is_active: Mapped[bool]=mapped_column(Boolean, default=True)
     role: Mapped[str]=mapped_column(String(40), default='Admin', index=True)
 
 class SessionToken(TimestampMixin, Base):
     __tablename__='session_tokens'
+    __table_args__=(Index('ix_session_tokens_token_hash','token_hash'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     admin_id: Mapped[int]=mapped_column(ForeignKey('admins.id'), index=True)
-    token_hash: Mapped[str]=mapped_column(String(64), unique=True, index=True)
+    token_hash: Mapped[str]=mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), index=True)
     revoked_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -52,8 +54,9 @@ class Market(TimestampMixin, Base):
 
 class CountryProfile(TimestampMixin, Base):
     __tablename__='country_profiles'
+    __table_args__=(Index('ix_country_profiles_country_code','country_code'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    country_code: Mapped[str]=mapped_column(String(10), unique=True, index=True)
+    country_code: Mapped[str]=mapped_column(String(10), unique=True)
     country_name: Mapped[str]=mapped_column(String(120), index=True)
     currencies: Mapped[list]=mapped_column(JSON, default=list)
     languages: Mapped[list]=mapped_column(JSON, default=list)
@@ -174,6 +177,7 @@ class Source(TimestampMixin, Base):
 
 class Supplier(TimestampMixin, Base):
     __tablename__='suppliers'
+    __table_args__=(Index('ix_suppliers_canonical_key','canonical_key'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     canonical_name: Mapped[str]=mapped_column(String(250), index=True)
     country: Mapped[str]=mapped_column(String(100), default='Iran', index=True)
@@ -184,11 +188,12 @@ class Supplier(TimestampMixin, Base):
     verification_status: Mapped[str]=mapped_column(String(30), default='Unverified', index=True)
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     trust_score: Mapped[float]=mapped_column(Float, default=0.0, index=True)
-    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True, index=True)
+    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class Buyer(TimestampMixin, Base):
     __tablename__='buyers'
+    __table_args__=(Index('ix_buyers_canonical_key','canonical_key'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     canonical_name: Mapped[str]=mapped_column(String(250), index=True)
     country: Mapped[str]=mapped_column(String(100), index=True)
@@ -199,7 +204,7 @@ class Buyer(TimestampMixin, Base):
     verification_status: Mapped[str]=mapped_column(String(30), default='Potential', index=True)
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     reliability_score: Mapped[float]=mapped_column(Float, default=0.0, index=True)
-    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True, index=True)
+    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class Manufacturer(TimestampMixin, Base):
@@ -295,6 +300,8 @@ class SourceSignal(TimestampMixin, Base):
 
 class Opportunity(TimestampMixin, Base):
     __tablename__='opportunities'
+    # Preserve the legacy composite index used by stage/update queue queries.
+    __table_args__=(Index('ix_opportunities_stage_updated','opportunity_stage','stage_updated_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     manufacturer_id: Mapped[int]=mapped_column(ForeignKey('manufacturers.id'), index=True)
     customer_id: Mapped[int]=mapped_column(ForeignKey('customers.id'), index=True)
@@ -332,6 +339,8 @@ class Opportunity(TimestampMixin, Base):
 
 class CommercialFact(TimestampMixin, Base):
     __tablename__='commercial_facts'
+    # Keep the established entity lookup index; separate field indexes are additive.
+    __table_args__=(Index('ix_commercial_facts_entity','entity_type','entity_id'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     entity_type: Mapped[str]=mapped_column(String(60), index=True)
     entity_id: Mapped[int]=mapped_column(Integer, index=True)
@@ -346,6 +355,8 @@ class CommercialFact(TimestampMixin, Base):
 
 class FXRate(TimestampMixin, Base):
     __tablename__='fx_rates'
+    # Preserve the currency-pair lookup index from migration 0038.
+    __table_args__=(Index('ix_fx_rates_pair','base_currency','quote_currency'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     base_currency: Mapped[str]=mapped_column(String(10), index=True)
     quote_currency: Mapped[str]=mapped_column(String(10), index=True)
@@ -551,11 +562,13 @@ class CommercialOffer(TimestampMixin, Base):
     estimated_profit: Mapped[float]=mapped_column(Float, default=0.0)
     estimated_profit_percent: Mapped[float]=mapped_column(Float, default=0.0)
     logistics_scenario_id: Mapped[int|None]=mapped_column(ForeignKey('logistics_scenarios.id'), nullable=True, index=True)
-    incoterm: Mapped[str]=mapped_column(String(20), default='CIF')
-    cfr_total: Mapped[float]=mapped_column(Float, default=0.0)
-    cfr_unit_price: Mapped[float]=mapped_column(Float, default=0.0)
-    landed_total: Mapped[float]=mapped_column(Float, default=0.0)
-    landed_unit_price: Mapped[float]=mapped_column(Float, default=0.0)
+    # Draft offers may not have a confirmed Incoterm yet; migration 0009 keeps this nullable.
+    incoterm: Mapped[str | None]=mapped_column(String(20), nullable=True, default='CIF')
+    # Derived commercial totals remain nullable until calculated from sufficient inputs.
+    cfr_total: Mapped[float | None]=mapped_column(Float, nullable=True)
+    cfr_unit_price: Mapped[float | None]=mapped_column(Float, nullable=True)
+    landed_total: Mapped[float | None]=mapped_column(Float, nullable=True)
+    landed_unit_price: Mapped[float | None]=mapped_column(Float, nullable=True)
     status: Mapped[str]=mapped_column(String(30), default='Draft', index=True)
     notes: Mapped[str|None]=mapped_column(Text, nullable=True)
     assumptions: Mapped[dict]=mapped_column(JSON, default=dict)
@@ -589,6 +602,8 @@ class LogisticsScenario(TimestampMixin, Base):
 
 class MarketPriceObservation(TimestampMixin, Base):
     __tablename__='market_price_observations'
+    # Preserve the composite index for product/market/time-series lookups.
+    __table_args__=(Index('ix_market_price_obs_product_market_observed','product_id','market','observed_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     product_id: Mapped[int]=mapped_column(ForeignKey('products.id'), index=True)
     market: Mapped[str]=mapped_column(String(160), index=True)
@@ -678,8 +693,9 @@ class TransactionEvent(TimestampMixin, Base):
 
 class TradeOutcomeFeedback(TimestampMixin, Base):
     __tablename__='trade_outcome_feedback'
+    __table_args__=(Index('ix_trade_outcome_feedback_transaction_id','transaction_id'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    transaction_id: Mapped[int]=mapped_column(ForeignKey('transactions.id'), unique=True, index=True)
+    transaction_id: Mapped[int]=mapped_column(ForeignKey('transactions.id'), unique=True)
     opportunity_id: Mapped[int]=mapped_column(ForeignKey('opportunities.id'), index=True)
     product_id: Mapped[int]=mapped_column(ForeignKey('products.id'), index=True)
     customer_id: Mapped[int|None]=mapped_column(ForeignKey('customers.id'), nullable=True, index=True)
@@ -848,7 +864,12 @@ class EntityLink(TimestampMixin, Base):
     reasons: Mapped[list]=mapped_column(JSON, default=list)
     evidence: Mapped[dict]=mapped_column(JSON, default=dict)
     reviewed: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
-    __table_args__=(Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True), CheckConstraint('NOT (left_type = right_type AND left_id = right_id)', name='ck_entity_links_not_self'))
+    __table_args__=(
+        Index('ix_entity_links_left','left_type','left_id'),
+        Index('ix_entity_links_right','right_type','right_id'),
+        Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True),
+        CheckConstraint('NOT (left_type = right_type AND left_id = right_id)', name='ck_entity_links_not_self'),
+    )
 
 class SearchCache(TimestampMixin, Base):
     __tablename__='search_cache'
@@ -875,6 +896,8 @@ class DiscoveryUsage(TimestampMixin, Base):
 
 class DiscoveryJob(TimestampMixin, Base):
     __tablename__='discovery_jobs'
+    # Preserve the queue/heartbeat index used for stale-job recovery.
+    __table_args__=(Index('ix_discovery_jobs_status_heartbeat','status','heartbeat_at'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     job_type: Mapped[str]=mapped_column(String(50),index=True)
     status: Mapped[str]=mapped_column(String(30),default='queued',index=True)
