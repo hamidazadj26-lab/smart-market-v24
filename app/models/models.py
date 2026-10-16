@@ -11,17 +11,19 @@ class TimestampMixin:
 
 class Admin(TimestampMixin, Base):
     __tablename__='admins'
+    __table_args__=(Index('ix_admins_username','username'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    username: Mapped[str]=mapped_column(String(80), unique=True, index=True)
+    username: Mapped[str]=mapped_column(String(80), unique=True)
     password_hash: Mapped[str]=mapped_column(String(255))
     is_active: Mapped[bool]=mapped_column(Boolean, default=True)
     role: Mapped[str]=mapped_column(String(40), default='Admin', index=True)
 
 class SessionToken(TimestampMixin, Base):
     __tablename__='session_tokens'
+    __table_args__=(Index('ix_session_tokens_token_hash','token_hash'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     admin_id: Mapped[int]=mapped_column(ForeignKey('admins.id'), index=True)
-    token_hash: Mapped[str]=mapped_column(String(64), unique=True, index=True)
+    token_hash: Mapped[str]=mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), index=True)
     revoked_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -52,8 +54,9 @@ class Market(TimestampMixin, Base):
 
 class CountryProfile(TimestampMixin, Base):
     __tablename__='country_profiles'
+    __table_args__=(Index('ix_country_profiles_country_code','country_code'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    country_code: Mapped[str]=mapped_column(String(10), unique=True, index=True)
+    country_code: Mapped[str]=mapped_column(String(10), unique=True)
     country_name: Mapped[str]=mapped_column(String(120), index=True)
     currencies: Mapped[list]=mapped_column(JSON, default=list)
     languages: Mapped[list]=mapped_column(JSON, default=list)
@@ -174,6 +177,7 @@ class Source(TimestampMixin, Base):
 
 class Supplier(TimestampMixin, Base):
     __tablename__='suppliers'
+    __table_args__=(Index('ix_suppliers_canonical_key','canonical_key'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     canonical_name: Mapped[str]=mapped_column(String(250), index=True)
     country: Mapped[str]=mapped_column(String(100), default='Iran', index=True)
@@ -184,11 +188,12 @@ class Supplier(TimestampMixin, Base):
     verification_status: Mapped[str]=mapped_column(String(30), default='Unverified', index=True)
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     trust_score: Mapped[float]=mapped_column(Float, default=0.0, index=True)
-    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True, index=True)
+    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class Buyer(TimestampMixin, Base):
     __tablename__='buyers'
+    __table_args__=(Index('ix_buyers_canonical_key','canonical_key'),)
     id: Mapped[int]=mapped_column(primary_key=True)
     canonical_name: Mapped[str]=mapped_column(String(250), index=True)
     country: Mapped[str]=mapped_column(String(100), index=True)
@@ -199,7 +204,7 @@ class Buyer(TimestampMixin, Base):
     verification_status: Mapped[str]=mapped_column(String(30), default='Potential', index=True)
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     reliability_score: Mapped[float]=mapped_column(Float, default=0.0, index=True)
-    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True, index=True)
+    canonical_key: Mapped[str|None]=mapped_column(String(300), nullable=True, unique=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class Manufacturer(TimestampMixin, Base):
@@ -680,8 +685,9 @@ class TransactionEvent(TimestampMixin, Base):
 
 class TradeOutcomeFeedback(TimestampMixin, Base):
     __tablename__='trade_outcome_feedback'
+    __table_args__=(Index('ix_trade_outcome_feedback_transaction_id','transaction_id'),)
     id: Mapped[int]=mapped_column(primary_key=True)
-    transaction_id: Mapped[int]=mapped_column(ForeignKey('transactions.id'), unique=True, index=True)
+    transaction_id: Mapped[int]=mapped_column(ForeignKey('transactions.id'), unique=True)
     opportunity_id: Mapped[int]=mapped_column(ForeignKey('opportunities.id'), index=True)
     product_id: Mapped[int]=mapped_column(ForeignKey('products.id'), index=True)
     customer_id: Mapped[int|None]=mapped_column(ForeignKey('customers.id'), nullable=True, index=True)
