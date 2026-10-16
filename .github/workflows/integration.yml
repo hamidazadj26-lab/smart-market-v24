@@ -78,30 +78,43 @@ jobs:
           alembic heads
           python -m compileall -q app migrations scripts
       - name: Diagnose Alembic database revision state
-        # Diagnostic only: keep the blocking audit as the authoritative release gate.
+        # Diagnostic only: preserve revision evidence even if later checks fail.
         continue-on-error: true
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
         run: |
-          python - <<'PY'
-          import os
-          from sqlalchemy import create_engine, inspect, text
-          from alembic.config import Config
-          from alembic.script import ScriptDirectory
+          mkdir -p artifacts/schema-drift
+          {
+            echo "===== Alembic CLI current ====="
+            alembic current -v
+            echo "===== Alembic CLI heads ====="
+            alembic heads -v
+            echo "===== Alembic CLI history (top) ====="
+            alembic history --verbose | head -80
+            echo "===== SQLAlchemy database revision rows ====="
+            python - <<'PY'
+            import os
+            from sqlalchemy import create_engine, inspect, text
+            from alembic.config import Config
+            from alembic.script import ScriptDirectory
+            from alembic.runtime.migration import MigrationContext
 
-          engine = create_engine(os.environ["DATABASE_URL"])
-          with engine.connect() as connection:
-              tables = set(inspect(connection).get_table_names())
-              if "alembic_version" in tables:
-                  current = connection.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num")).scalars().all()
-              else:
-                  current = []
-              print(f"Database Alembic revisions: {current}")
-          engine.dispose()
-
-          script = ScriptDirectory.from_config(Config("alembic.ini"))
-          print(f"Repository Alembic heads: {script.get_heads()}")
-          PY
+            url = os.environ["DATABASE_URL"]
+            engine = create_engine(url)
+            with engine.connect() as connection:
+                tables = set(inspect(connection).get_table_names())
+                if "alembic_version" in tables:
+                    print("database version rows:", connection.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num")).scalars().all())
+                else:
+                    print("alembic_version table is missing")
+                mc = MigrationContext.configure(connection)
+                print("migration context current heads:", mc.get_current_heads())
+            engine.dispose()
+            script = ScriptDirectory.from_config(Config("alembic.ini"))
+            print("repository heads:", script.get_heads())
+            print("repository current revisions:", script.get_current_head())
+            PY
+          } 2>&1 | tee artifacts/schema-drift/revision-state.log
       - name: Generate review-only ORM/schema drift proposal
         # Diagnostic only: its failure must not skip the authoritative blocking audit below.
         continue-on-error: true
