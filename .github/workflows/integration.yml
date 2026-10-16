@@ -87,9 +87,21 @@ jobs:
           engine = create_engine(url)
           try:
               with engine.connect() as connection:
+                  identity = connection.execute(text(
+                      "SELECT current_database(), current_schema(), current_setting('search_path')"
+                  )).one()
+                  print(f"Migration verification database identity: {identity}")
+                  version_tables = connection.execute(text("""
+                      SELECT schemaname, tablename
+                      FROM pg_catalog.pg_tables
+                      WHERE tablename = 'alembic_version'
+                      ORDER BY schemaname
+                  """)).all()
+                  print(f"alembic_version tables across schemas: {version_tables}")
                   tables = set(inspect(connection).get_table_names())
+                  print(f"Tables visible in default schema ({identity[1]}): {sorted(tables)}")
                   if "alembic_version" not in tables:
-                      raise SystemExit("BLOCKER: alembic upgrade head returned successfully but alembic_version is missing")
+                      raise SystemExit("BLOCKER: alembic upgrade head returned successfully but alembic_version is missing from the default schema")
                   actual = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
                   print(f"Database revision(s): {actual}")
                   print(f"Expected repository head: {expected}")
