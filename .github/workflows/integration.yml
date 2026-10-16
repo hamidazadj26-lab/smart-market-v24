@@ -77,8 +77,7 @@ jobs:
           alembic current
           alembic heads
           python -m compileall -q app migrations scripts
-      - name: Audit ORM-to-migration schema drift (known baseline; non-blocking)
-        continue-on-error: true
+      - name: Audit ORM-to-migration schema drift (blocking release gate)
         env:
           DATABASE_URL: postgresql+psycopg://smart_test:test-only-password@localhost:5432/smart_market_migration_test
         run: alembic check
