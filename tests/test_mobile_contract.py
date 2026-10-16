@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static"
@@ -7,9 +6,10 @@ STATIC = ROOT / "static"
 
 def _current_frontend_version():
     config = (ROOT / "app" / "config.py").read_text()
-    match = re.search(r"version:\\s*str\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", config)
-    assert match, "app/config.py must declare the application version"
-    return match.group(1)
+    for line in config.splitlines():
+        if line.lstrip().startswith("version:"):
+            return line.split("=", 1)[1].strip().strip("'\\\"")
+    raise AssertionError("app/config.py must declare the application version")
 
 
 def test_index_is_mobile_first_and_rtl():
