@@ -111,7 +111,7 @@ jobs:
           {
             echo "### Release blocker: ORM/schema drift"
             echo "The Alembic schema audit detected differences between ORM metadata and the migrated PostgreSQL schema."
-            echo "This step is temporarily non-blocking only so security, container build, and smoke tests can run and reveal additional issues."
+            echo "The release gate remains blocking; later diagnostics are allowed to run despite this failure so additional issues can be identified."
             echo "**This does not mean the project is production-ready.** Review the generated migration proposal manually; do not apply it blindly because it drops composite indexes and changes unique-constraint/index representations."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Security dependency audit
