@@ -2,7 +2,7 @@ from logging.config import fileConfig
 import os
 
 from alembic import context
-from sqlalchemy import String, Text, engine_from_config, inspect, pool
+from sqlalchemy import String, Text, create_engine, inspect, pool
 from sqlalchemy.schema import Index
 
 from app.database import Base
@@ -152,12 +152,17 @@ def run_migrations_offline():
 
 def run_migrations_online():
     global _reflected_index_signatures
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Build the engine directly from the same explicit URL used by the
+    # verifier. This avoids any stale or overridden sqlalchemy.url in Alembic
+    # ConfigParser sections and guarantees the migration target is DATABASE_URL.
+    connectable = create_engine(_database_url(), poolclass=pool.NullPool)
     with connectable.connect() as connection:
+        database_identity = connection.execute(
+            __import__("sqlalchemy").text(
+                "SELECT current_database(), current_schema(), current_setting('search_path')"
+            )
+        ).one()
+        print(f"Alembic migration database identity: {database_identity}")
         _reflected_index_signatures = _load_reflected_index_signatures(connection)
         context.configure(
             connection=connection,
