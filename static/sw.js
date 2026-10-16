@@ -1,5 +1,5 @@
-const CACHE = 'smart-market-v24.23.0';
-const SHELL = ['/', '/static/index.html', '/static/styles.css?v=24.23.0', '/static/app.js?v=24.23.0', '/static/manifest.json', '/static/brand-mark.svg', '/static/icons/icon-192.png', '/static/icons/icon-512.png'];
+const CACHE = 'smart-market-v24.24.0';
+const SHELL = ['/', '/static/index.html', '/static/styles.css?v=24.24.0', '/static/app.js?v=24.24.0', '/static/manifest.json', '/static/brand-mark.svg', '/static/icons/icon-192.png', '/static/icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
