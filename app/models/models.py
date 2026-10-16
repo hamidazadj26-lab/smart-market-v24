@@ -551,11 +551,13 @@ class CommercialOffer(TimestampMixin, Base):
     estimated_profit: Mapped[float]=mapped_column(Float, default=0.0)
     estimated_profit_percent: Mapped[float]=mapped_column(Float, default=0.0)
     logistics_scenario_id: Mapped[int|None]=mapped_column(ForeignKey('logistics_scenarios.id'), nullable=True, index=True)
-    incoterm: Mapped[str]=mapped_column(String(20), default='CIF')
-    cfr_total: Mapped[float]=mapped_column(Float, default=0.0)
-    cfr_unit_price: Mapped[float]=mapped_column(Float, default=0.0)
-    landed_total: Mapped[float]=mapped_column(Float, default=0.0)
-    landed_unit_price: Mapped[float]=mapped_column(Float, default=0.0)
+    # Draft offers may not have a confirmed Incoterm yet; migration 0009 keeps this nullable.
+    incoterm: Mapped[str | None]=mapped_column(String(20), nullable=True, default='CIF')
+    # Derived commercial totals remain nullable until calculated from sufficient inputs.
+    cfr_total: Mapped[float | None]=mapped_column(Float, nullable=True, default=0.0)
+    cfr_unit_price: Mapped[float | None]=mapped_column(Float, nullable=True, default=0.0)
+    landed_total: Mapped[float | None]=mapped_column(Float, nullable=True, default=0.0)
+    landed_unit_price: Mapped[float | None]=mapped_column(Float, nullable=True, default=0.0)
     status: Mapped[str]=mapped_column(String(30), default='Draft', index=True)
     notes: Mapped[str|None]=mapped_column(Text, nullable=True)
     assumptions: Mapped[dict]=mapped_column(JSON, default=dict)
