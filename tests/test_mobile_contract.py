@@ -1,7 +1,15 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "static"
+
+
+def _current_frontend_version():
+    config = (ROOT / "app" / "config.py").read_text()
+    match = re.search(r"version:\\s*str\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", config)
+    assert match, "app/config.py must declare the application version"
+    return match.group(1)
 
 
 def test_index_is_mobile_first_and_rtl():
@@ -28,11 +36,12 @@ def test_pwa_manifest_has_install_icons():
 def test_service_worker_cache_matches_current_frontend_version():
     sw = (STATIC / "sw.js").read_text()
     idx = (STATIC / "index.html").read_text()
-    assert "24.23.0" in sw
-    assert "styles.css?v=24.23.0" in sw
-    assert "app.js?v=24.23.0" in sw
-    assert "styles.css?v=24.23.0" in idx
-    assert "app.js?v=24.23.0" in idx
+    version = _current_frontend_version()
+    assert f"smart-market-v{version}" in sw
+    assert f"styles.css?v={version}" in sw
+    assert f"app.js?v={version}" in sw
+    assert f"styles.css?v={version}" in idx
+    assert f"app.js?v={version}" in idx
 
 
 def test_repository_excludes_runtime_state_and_secrets():
@@ -49,7 +58,8 @@ def test_trade_radar_is_exposed_in_dashboard_and_cache_bumped():
     assert 'id="tradeRadar"' in js
     assert "tradeRadarCenter" in js
     assert "/api/intelligence/trade-radar" in js
-    assert "24.23.0" in idx and "24.23.0" in sw
+    version = _current_frontend_version()
+    assert version in idx and version in sw
 
 
 def test_interactive_map_is_wired_to_authenticated_geojson_endpoint():
