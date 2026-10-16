@@ -24,8 +24,17 @@ def _compare_type(context_, inspected_column, metadata_column, inspected_type, m
     return None
 
 
+def _index_signature(index):
+    """Return the schema-relevant shape of an index, excluding its name."""
+    columns = tuple(getattr(column, "name", None) for column in getattr(index, "columns", ()))
+    if not columns or any(column is None for column in columns):
+        return None
+    dialect_options = repr(getattr(index, "dialect_options", {}))
+    return columns, bool(getattr(index, "unique", False)), dialect_options
+
+
 def _include_object(object_, name, type_, reflected, compare_to):
-    """Exclude extension-owned and intentionally unmapped PostGIS schema objects."""
+    """Ignore extension-owned objects and name-only index drift, not shape changes."""
     if type_ == "table" and name == "spatial_ref_sys" and reflected:
         return False
 
@@ -33,10 +42,22 @@ def _include_object(object_, name, type_, reflected, compare_to):
     # but are intentionally not mapped in the ORM. Alembic must not propose dropping them.
     if reflected and type_ == "column" and name == "geom":
         return False
-    if reflected and type_ == "index":
+    if type_ == "index":
         columns = getattr(object_, "columns", ())
-        if name.endswith("_geom") or any(getattr(column, "name", None) == "geom" for column in columns):
+        if reflected and (
+            name.endswith("_geom")
+            or any(getattr(column, "name", None) == "geom" for column in columns)
+        ):
             return False
+
+        # Several historical migrations use concise index names while SQLAlchemy
+        # generates table/column-based names. If both indexes have identical ordered
+        # columns, uniqueness, and dialect options, their names are cosmetic. Ignore
+        # only this exact equivalence; composite-vs-single-column and unique-vs-
+        # non-unique differences must remain visible to the blocking schema gate.
+        if compare_to is not None and type(compare_to).__name__ == "Index":
+            if _index_signature(object_) == _index_signature(compare_to):
+                return False
     return True
 
 
