@@ -157,13 +157,23 @@ def run_migrations_online():
     # ConfigParser sections and guarantees the migration target is DATABASE_URL.
     connectable = create_engine(_database_url(), poolclass=pool.NullPool)
     with connectable.connect() as connection:
-        database_identity = connection.execute(
-            text(
-                "SELECT current_database(), current_schema(), current_setting('search_path')"
-            )
-        ).one()
-        print(f"Alembic migration database identity: {database_identity}")
+        # Keep diagnostics portable: SQLite is used by the local/container smoke path.
+        if connection.dialect.name == "postgresql":
+            database_identity = connection.execute(
+                text(
+                    "SELECT current_database(), current_schema(), current_setting('search_path')"
+                )
+            ).one()
+            print(f"Alembic migration database identity: {database_identity}")
+        else:
+            print(f"Alembic migration dialect: {connection.dialect.name}")
+
         _reflected_index_signatures = _load_reflected_index_signatures(connection)
+        # The diagnostic SELECT/reflection above triggers SQLAlchemy autobegin.
+        # Commit it before Alembic starts its own transaction; otherwise Alembic
+        # can treat the transaction as externally managed and closing this
+        # connection rolls back every DDL migration while reporting success.
+        connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
