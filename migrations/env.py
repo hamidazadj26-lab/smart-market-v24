@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 
 from alembic import context
 from sqlalchemy import String, Text, engine_from_config, inspect, pool
@@ -9,7 +10,16 @@ from app.models import *
 from app.config import get_settings
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+
+
+def _database_url():
+    """Use the explicit runtime DATABASE_URL before the application fallback."""
+    return os.environ.get("DATABASE_URL") or get_settings().database_url
+
+
+# ConfigParser treats percent signs as interpolation markers; escape them when
+# storing a URL in Alembic config, while passing the original URL to offline mode.
+config.set_main_option("sqlalchemy.url", _database_url().replace("%", "%%"))
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
@@ -130,7 +140,7 @@ def _include_object(object_, name, type_, reflected, compare_to):
 
 def run_migrations_offline():
     context.configure(
-        url=get_settings().database_url,
+        url=_database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=_compare_type,
