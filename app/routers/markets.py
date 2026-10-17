@@ -17,8 +17,26 @@ router = APIRouter(tags=["markets", "trade-rules"])
 def markets_list(request:Request, db:Session=Depends(get_db), active_only:bool=True):
     auth(request,db)
     q=db.query(Market)
-    if active_only: q=q.filter(Market.active==True)
-    return [serialize_market(x) for x in q.order_by(Market.name).all()]
+    if active_only:
+        q=q.filter(Market.active==True)
+    markets=q.order_by(Market.name).all()
+
+    # SMART MARKET's initial operating corridor must exist on a fresh database.
+    # Keep this idempotent and limited to the empty active-market case so that
+    # existing multi-market configurations are never overwritten.
+    if active_only and not markets:
+        default_name='Iran → Afghanistan'
+        default_market=db.query(Market).filter(Market.name==default_name).first()
+        if default_market:
+            if not default_market.active:
+                default_market.active=True
+                db.commit()
+                db.refresh(default_market)
+        else:
+            default_market=get_or_create_market(db,'Iran','Afghanistan',default_name)
+        markets=[default_market]
+
+    return [serialize_market(x) for x in markets]
 
 @router.post('/api/markets')
 def market_create(data:MarketProfileIn, request:Request, db:Session=Depends(get_db)):
