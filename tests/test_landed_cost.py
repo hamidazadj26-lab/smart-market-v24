@@ -14,3 +14,77 @@ def test_no_import_rule_does_not_invent_tax():
     r=calculate_total_landed_cost(quantity=10,currency='USD',supplier_cost=100,customs_value=None)
     assert r['import_taxes_and_fees']==0
     assert r['total_landed_cost']==100
+
+
+import pytest
+
+
+@pytest.mark.parametrize("field", [
+    "supplier_cost", "packaging_cost", "inland_cost", "export_cost",
+    "freight_cost", "insurance_cost", "destination_handling", "other_cost",
+])
+@pytest.mark.parametrize("bad_value", [-1, float("nan"), float("inf"), -float("inf")])
+def test_invalid_cost_components_are_rejected(field, bad_value):
+    kwargs = {"quantity": 1, "currency": "USD", "supplier_cost": 1, field: bad_value}
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(**kwargs)
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), 0, -1])
+def test_invalid_fx_rates_are_rejected(bad_value):
+    with pytest.raises(ValueError):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10,
+            fx_rate=bad_value, expected_currency="EUR",
+        )
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), -1])
+def test_invalid_import_taxes_are_rejected(bad_value):
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10,
+            import_cost={"total_import_taxes_and_fees": bad_value},
+        )
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf"), -1])
+def test_invalid_customs_values_are_rejected(bad_value):
+    with pytest.raises((TypeError, ValueError)):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=10, customs_value=bad_value,
+        )
+
+
+def test_boolean_cost_is_rejected_as_invalid_numeric_input():
+    with pytest.raises(TypeError):
+        calculate_total_landed_cost(
+            quantity=1, currency="USD", supplier_cost=True,
+        )
+
+
+def test_import_rule_amounts_are_converted_to_landed_cost_currency():
+    result = calculate_total_landed_cost(
+        quantity=2, currency="AFN", supplier_cost=1000,
+        customs_value=100, import_cost={
+            "currency": "USD", "customs_value": 100,
+            "total_import_taxes_and_fees": 10, "rule_id": 4,
+        }, fx_rate=70, expected_currency="USD",
+    )
+    assert result["customs_value"] == 7000
+    assert result["import_taxes_and_fees"] == 700
+    assert result["total_landed_cost"] == 1700
+    assert result["landed_unit_cost"] == 850
+    assert result["assumptions"]["currency_conversion_applied"] is True
+    assert result["assumptions"]["output_currency"] == "AFN"
+
+
+def test_import_rule_currency_must_match_declared_source_currency():
+    with pytest.raises(ValueError, match="import_cost currency"):
+        calculate_total_landed_cost(
+            quantity=1, currency="AFN", supplier_cost=100,
+            import_cost={
+                "currency": "EUR", "customs_value": 10,
+                "total_import_taxes_and_fees": 2,
+            }, fx_rate=70, expected_currency="USD",
+        )

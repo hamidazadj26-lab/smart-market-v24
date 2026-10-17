@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, Float, Integer, Boolean, DateTime, ForeignKey, JSON, Index
+from sqlalchemy import String, Text, Float, Integer, Boolean, DateTime, ForeignKey, JSON, Index, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 
@@ -264,6 +264,12 @@ class Demand(TimestampMixin, Base):
     confidence: Mapped[float]=mapped_column(Float, default=0.0)
     verification_status: Mapped[str]=mapped_column(String(30), default='Unverified', index=True)
     verification_notes: Mapped[str|None]=mapped_column(Text, nullable=True)
+    freshness_status: Mapped[str]=mapped_column(String(30), default='Unknown', index=True)
+    freshness_score: Mapped[float|None]=mapped_column(Float, nullable=True, index=True)
+    observed_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    updated_at_source: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    expires_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_verified_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
     is_archived: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
 
 class SourceSignal(TimestampMixin, Base):
@@ -820,6 +826,7 @@ class TradeOptimizationResult(TimestampMixin, Base):
 
 class EntityIdentity(TimestampMixin, Base):
     __tablename__='entity_identities'
+    __table_args__=(Index('ux_entity_identities_natural_key','entity_type','entity_id','identity_type','normalized_value',unique=True), CheckConstraint('confidence BETWEEN 0 AND 100', name='ck_entity_identities_confidence_range'))
     id: Mapped[int]=mapped_column(primary_key=True)
     entity_type: Mapped[str]=mapped_column(String(30), index=True)
     entity_id: Mapped[int]=mapped_column(Integer, index=True)
@@ -841,7 +848,7 @@ class EntityLink(TimestampMixin, Base):
     reasons: Mapped[list]=mapped_column(JSON, default=list)
     evidence: Mapped[dict]=mapped_column(JSON, default=dict)
     reviewed: Mapped[bool]=mapped_column(Boolean, default=False, index=True)
-    __table_args__=(Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True),)
+    __table_args__=(Index('ix_entity_links_pair','left_type','left_id','right_type','right_id',unique=True), CheckConstraint('NOT (left_type = right_type AND left_id = right_id)', name='ck_entity_links_not_self'))
 
 class SearchCache(TimestampMixin, Base):
     __tablename__='search_cache'

@@ -141,7 +141,26 @@ async def routes(data:RouteIn,request:Request,db=Depends(get_db)):
 @router.get('/api/discovery/sources')
 def discovery_sources(request:Request, db:Session=Depends(get_db)):
     auth(request,db)
-    return {'sources':[{'key':x.key,'label':x.label,'channel':x.channel,'domains':list(x.domains),'description':x.description,'configured': bool(settings.google_maps_api_key) if x.channel=='google_places' else bool(settings.divar_api_key or settings.firecrawl_api_key) if x.channel=='divar' else bool(settings.firecrawl_api_key) if x.channel=='firecrawl' else False} for x in BUILTIN_SOURCES]}
+    sources=[]
+    for source in BUILTIN_SOURCES:
+        if source.channel == 'google_places':
+            configured=bool(settings.google_maps_api_key)
+            hint='' if configured else 'در Railway متغیر GOOGLE_MAPS_API_KEY را تنظیم کنید.'
+        elif source.channel == 'divar':
+            configured=bool(settings.divar_api_key or settings.firecrawl_api_key)
+            hint='' if configured else 'برای اتصال رسمی DIVAR_API_KEY یا برای جستجوی عمومی FIRECRAWL_API_KEY لازم است.'
+        elif source.channel == 'firecrawl':
+            configured=bool(settings.firecrawl_api_key)
+            hint='' if configured else 'کلید Google Maps برای این منبع کافی نیست؛ FIRECRAWL_API_KEY را در Railway تنظیم کنید.'
+        else:
+            configured=False
+            hint='این اتصال در نسخه فعلی پیکربندی نشده است.'
+        sources.append({
+            'key':source.key,'label':source.label,'channel':source.channel,
+            'domains':list(source.domains),'description':source.description,
+            'configured':configured,'configuration_hint':hint,
+        })
+    return {'sources':sources}
 
 @router.post('/api/discovery/external')
 async def external_discovery(data:ExternalDiscoveryIn, request:Request, db=Depends(get_db)):
